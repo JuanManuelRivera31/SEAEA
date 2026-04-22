@@ -7,22 +7,22 @@
          metadata-complete="true">
  
     <!-- metadata-complete="true" le dice a Tomcat que IGNORE
-         las anotaciones @WebServlet en las clases Java.
-         Todo el mapeo se hace AQUÍ únicamente. -->
+    las anotaciones @WebServlet en las clases Java.
+    Todo el mapeo se hace AQUÍ únicamente. -->
  
     <display-name>SEAEA</display-name>
  
     <!-- ══════════════════════════════════════════════════════
-         PÁGINA DE BIENVENIDA
-         ══════════════════════════════════════════════════════ -->
+    PÁGINA DE BIENVENIDA
+    ══════════════════════════════════════════════════════ -->
     <welcome-file-list>
         <welcome-file>index.html</welcome-file>
         <welcome-file>login.jsp</welcome-file>
     </welcome-file-list>
  
     <!-- ══════════════════════════════════════════════════════
-         SERVLET: Login
-         ══════════════════════════════════════════════════════ -->
+    SERVLET: Login
+    ══════════════════════════════════════════════════════ -->
     <servlet>
         <servlet-name>LoginControlador</servlet-name>
         <servlet-class>controlador.LoginControlador</servlet-class>
@@ -33,8 +33,8 @@
     </servlet-mapping>
  
     <!-- ══════════════════════════════════════════════════════
-         SERVLET: Escenario 1
-         ══════════════════════════════════════════════════════ -->
+    SERVLETS: Escenarios
+    ══════════════════════════════════════════════════════ -->
     <servlet>
         <servlet-name>EscenarioUnoControlador</servlet-name>
         <servlet-class>controlador.EscenarioUnoControlador</servlet-class>
@@ -43,10 +43,29 @@
         <servlet-name>EscenarioUnoControlador</servlet-name>
         <url-pattern>/escenario1</url-pattern>
     </servlet-mapping>
+    
+    
+    <servlet>
+        <servlet-name>EscenarioDosControlador</servlet-name>
+        <servlet-class>controlador.EscenarioDosControlador</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>EscenarioDosControlador</servlet-name>
+        <url-pattern>/escenario2</url-pattern>
+    </servlet-mapping>
+    
+    <servlet>
+        <servlet-name>EscenarioTresControlador</servlet-name>
+        <servlet-class>controlador.EscenarioTresControlador</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>EscenarioTresControlador</servlet-name>
+        <url-pattern>/escenario3</url-pattern>
+    </servlet-mapping>
  
     <!-- ══════════════════════════════════════════════════════
-         SERVLET: Test de conexión
-         ══════════════════════════════════════════════════════ -->
+    SERVLET: Test de conexión
+    ══════════════════════════════════════════════════════ -->
     <servlet>
         <servlet-name>TestConexionServlet</servlet-name>
         <servlet-class>controlador.TestConexionServlet</servlet-class>
@@ -57,15 +76,15 @@
     </servlet-mapping>
  
     <!-- ══════════════════════════════════════════════════════
-         SESIÓN
-         ══════════════════════════════════════════════════════ -->
+    SESIÓN
+    ══════════════════════════════════════════════════════ -->
     <session-config>
         <session-timeout>60</session-timeout>
     </session-config>
  
     <!-- ══════════════════════════════════════════════════════
-         PÁGINAS DE ERROR
-         ══════════════════════════════════════════════════════ -->
+    PÁGINAS DE ERROR
+    ══════════════════════════════════════════════════════ -->
     <error-page>
         <error-code>404</error-code>
         <location>/login.jsp</location>

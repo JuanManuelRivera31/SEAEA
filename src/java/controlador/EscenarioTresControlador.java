@@ -2,7 +2,7 @@ package controlador;
 
 import dao.*;
 import modelo.*;
-import logica.EscenarioUnoServicio;
+import logica.EscenarioTresServicio;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -10,19 +10,19 @@ import jakarta.servlet.http.*;
 import java.io.IOException;
 
 /**
- * EscenarioUnoControlador
- * Servlet controlador del Escenario 1 "Arma tu átomo".
+ * EscenarioTresControlador
+ * Servlet controlador del Escenario 3 "Configura tu Átomo Objetivo".
  *
- * CORRECCIÓN: mensajeMascota ahora es específico según el resultado:
- *  - Éxito   → mensaje de felicitación + explicación pedagógica
- *  - Fallo   → mensaje de error específico sin revelar la respuesta
- *  - Agotado → mensaje de intentos agotados + nuevo reto generado
- *  - guiaMascota() SOLO se llama al cargar el escenario por primera vez
+ * Diferencia respecto al Escenario 1:
+ *  - El sistema genera un elemento aleatorio de la tabla periódica.
+ *  - El usuario debe igualar SOLO el número atómico Z (protones)
+ *    y el número másico A (protones + neutrones).
+ *  - Los electrones NO se evalúan en la comprobación.
  */
-@WebServlet("/escenario1")
-public class EscenarioUnoControlador extends HttpServlet {
+@WebServlet("/escenario3")
+public class EscenarioTresControlador extends HttpServlet {
 
-    private static final int ID_ESCENARIO = 1;
+    private static final int ID_ESCENARIO = 3;
 
     private final ElementoBaseDAO      elementoDAO  = new ElementoBaseDAO();
     private final RetoDAO              retoDAO      = new RetoDAO();
@@ -87,9 +87,9 @@ public class EscenarioUnoControlador extends HttpServlet {
                 accionCargar(escenario, usuario, req, sesion);
         }
 
-        sesion.setAttribute("escenario1", escenario);
+        sesion.setAttribute("escenario3", escenario);
         publicarDatosAtomo(escenario, req);
-        req.getRequestDispatcher("/escenario1/escenario1.jsp").forward(req, resp);
+        req.getRequestDispatcher("/escenario3/escenario3.jsp").forward(req, resp);
     }
 
     // ── CARGAR ──────────────────────────────────────────────────────────────
@@ -98,9 +98,8 @@ public class EscenarioUnoControlador extends HttpServlet {
         escenario.cargarEscenario();
         float pct = progresoDAO.obtenerPorcentaje(usuario.getIdUsuario(), ID_ESCENARIO);
         escenario.getProgreso().setPorcentajeAprendizaje(pct);
-        // guiaMascota() SOLO aquí → la guía inicial de 5 pasos
         req.setAttribute("mensajeMascota", escenario.guiaMascota());
-        sesion.setAttribute("escenario1", escenario);
+        sesion.setAttribute("escenario3", escenario);
     }
 
     // ── INCREMENTAR / DECREMENTAR ────────────────────────────────────────────
@@ -113,8 +112,12 @@ public class EscenarioUnoControlador extends HttpServlet {
                 el.incrementarProtones();
                 actualizarElementoPorProtones(escenario, el.getProtones(), req);
                 break;
-            case "neutrones":  el.incrementarNeutrones(); break;
-            case "electrones": el.incrementarElectrones(); break;
+            case "neutrones":
+                el.incrementarNeutrones();
+                break;
+            case "electrones":
+                el.incrementarElectrones();
+                break;
         }
     }
 
@@ -127,16 +130,20 @@ public class EscenarioUnoControlador extends HttpServlet {
                 el.decrementarProtones();
                 actualizarElementoPorProtones(escenario, el.getProtones(), req);
                 break;
-            case "neutrones":  el.decrementarNeutrones(); break;
-            case "electrones": el.decrementarElectrones(); break;
+            case "neutrones":
+                el.decrementarNeutrones();
+                break;
+            case "electrones":
+                el.decrementarElectrones();
+                break;
         }
     }
 
     // ── REINICIAR ────────────────────────────────────────────────────────────
     private void accionReiniciar(Escenario escenario, HttpSession sesion) {
         escenario.reiniciarEscenario();
-        sesion.removeAttribute("retoActual");
-        sesion.removeAttribute("retoObjetivo");
+        sesion.removeAttribute("retoActual3");
+        sesion.removeAttribute("retoObjetivo3");
     }
 
     // ── INICIAR EVALUACIÓN ───────────────────────────────────────────────────
@@ -148,17 +155,17 @@ public class EscenarioUnoControlador extends HttpServlet {
 
     // ── COMPROBAR ────────────────────────────────────────────────────────────
     /**
-     * CORRECCIÓN PRINCIPAL:
-     * - Éxito → mensaje pedagógico específico sobre el átomo construido
-     * - Fallo parcial → mensaje de orientación SIN revelar la respuesta
-     * - Fallo total (3 intentos) → mensaje de agotamiento + info del nuevo reto
-     * NUNCA se llama a guiaMascota() aquí.
+     * Lógica de comprobación del Escenario 3:
+     * Se valida SOLO que:
+     *   - protones del estudiante == Z del objetivo  (número atómico)
+     *   - (protones + neutrones) del estudiante == A del objetivo (número másico)
+     * Los electrones NO se evalúan.
      */
     private void accionComprobar(Escenario escenario, Usuario usuario,
                                   HttpServletRequest req, HttpSession sesion) {
 
-        Reto    retoActual    = (Reto)    sesion.getAttribute("retoActual");
-        Elemento retoObjetivo = (Elemento) sesion.getAttribute("retoObjetivo");
+        Reto     retoActual    = (Reto)     sesion.getAttribute("retoActual3");
+        Elemento retoObjetivo  = (Elemento) sesion.getAttribute("retoObjetivo3");
 
         if (retoActual == null || retoObjetivo == null) {
             req.setAttribute("mensajeMascota", "No hay un reto activo. Presiona 'Iniciar Evaluación'.");
@@ -166,9 +173,11 @@ public class EscenarioUnoControlador extends HttpServlet {
         }
 
         Elemento atomoEstudiante = escenario.getElemento();
-        boolean correcto = retoActual.comprobarReto(atomoEstudiante, retoObjetivo);
 
-        // Registrar intento ANTES de calcular puntaje
+        // ── Comprobación específica del Escenario 3 (Z y A) ──────────────────
+        boolean correcto = (atomoEstudiante.getProtones()     == retoObjetivo.getProtones()) &&
+                           (atomoEstudiante.getNumeroMasico() == retoObjetivo.getNumeroMasico());
+
         retoActual.registrarIntento();
         int intento = retoActual.getIntentos();
 
@@ -188,14 +197,18 @@ public class EscenarioUnoControlador extends HttpServlet {
             progresoDAO.guardar(usuario.getIdUsuario(), ID_ESCENARIO, nuevoPorcentaje);
             escenario.getProgreso().setPorcentajeAprendizaje(nuevoPorcentaje);
 
-            // Mensaje ESPECÍFICO de éxito (no la guía inicial)
             ElementoBase eb = retoActual.getElementoObjetivo();
-            String nombreElem = (eb != null) ? eb.getNombre() : "el elemento";
+            String nombreElem = (eb != null) ? eb.getNombre()   : "el elemento";
             String simbolo    = (eb != null) ? " (" + eb.getSimbolo() + ")" : "";
-            String msgExito = "¡Lo lograste! Construiste correctamente el átomo de "
-                + nombreElem + simbolo + " en el intento " + intento + ". "
-                + "Recuerda: el número atómico Z = número de protones, "
-                + "y la carga neta = protones − electrones.";
+            int    zA         = (eb != null) ? eb.getNumeroAtomico() : retoObjetivo.getProtones();
+            int    masico     = retoObjetivo.getNumeroMasico();
+
+            String msgExito =
+                "¡Lo lograste! Configuraste correctamente el átomo de "
+                + nombreElem + simbolo + " en el intento " + intento + ".\n"
+                + "Z = " + zA + " (protones) · A = " + masico
+                + " (número másico) · Neutrones = " + retoObjetivo.getNeutrones() + ".\n"
+                + "Recuerda: A = Z + N  →  N = A − Z.";
             req.setAttribute("mensajeMascota", msgExito);
 
             if (nuevoPorcentaje >= 80.0f) {
@@ -218,28 +231,39 @@ public class EscenarioUnoControlador extends HttpServlet {
                 escenario.getProgreso().setPorcentajeAprendizaje(nuevoPorcentaje);
                 retoDAO.actualizar(retoActual);
 
-                // Mensaje ESPECÍFICO de agotamiento
                 req.setAttribute("mensajeMascota",
-                    "Agotaste los 3 intentos para este reto. ¡No te rindas! "
+                    "Agotaste los 3 intentos para este reto. ¡No te rindas!\n"
                     + "He generado un nuevo reto para que puedas seguir aprendiendo.");
 
-                // Generar nuevo reto (la descripción quedará en req como "descripcionReto")
                 generarNuevoReto(escenario, usuario, req, sesion);
 
             } else {
                 // ── FALLO PARCIAL ──────────────────────────────────────────
                 int restantes = Reto.MAX_INTENTOS - intento;
+
+                // Pistas específicas: indicar si Z o A están mal
+                boolean zOk = atomoEstudiante.getProtones()     == retoObjetivo.getProtones();
+                boolean aOk = atomoEstudiante.getNumeroMasico() == retoObjetivo.getNumeroMasico();
+
+                String pista;
+                if (!zOk && !aOk) {
+                    pista = "Tanto el número atómico (Z) como el número másico (A) son incorrectos.";
+                } else if (!zOk) {
+                    pista = "El número atómico (Z = protones) no es correcto. Revisa los protones.";
+                } else {
+                    pista = "El número másico (A = protones + neutrones) no es correcto. Revisa los neutrones.";
+                }
+
                 req.setAttribute("mensajeMascota",
-                    "Esa configuración no es correcta aún. "
-                    + "Revisa bien las cantidades de cada partícula. "
-                    + "Te quedan " + restantes + " intento(s) para este reto.");
+                    "Esa configuración no es correcta aún. " + pista
+                    + "\nTe quedan " + restantes + " intento(s) para este reto.");
             }
         }
 
-        sesion.setAttribute("retoActual", retoActual);
+        sesion.setAttribute("retoActual3", retoActual);
 
-        // Publicar datos del reto actual para el HUD
-        Reto ra = (Reto) sesion.getAttribute("retoActual");
+        // Publicar datos del reto para el HUD
+        Reto ra = (Reto) sesion.getAttribute("retoActual3");
         if (ra != null) {
             req.setAttribute("retoActual",    ra);
             req.setAttribute("temporizador",  ra.getTemporizador());
@@ -248,6 +272,9 @@ public class EscenarioUnoControlador extends HttpServlet {
                 req.setAttribute("descripcionReto", ra.mostrarReto());
             }
         }
+
+        // Publicar elemento objetivo para mostrarlo en pantalla
+        publicarElementoObjetivo(retoObjetivo, retoActual, req);
     }
 
     // ── CONTINUAR ────────────────────────────────────────────────────────────
@@ -255,8 +282,8 @@ public class EscenarioUnoControlador extends HttpServlet {
                                   HttpServletResponse resp) throws IOException {
         if (escenario.getProgreso().getPorcentajeAprendizaje() >= 80.0f) {
             escenario.superarEscenario();
-            sesion.removeAttribute("escenario1");
-            resp.sendRedirect("escenario2");
+            sesion.removeAttribute("escenario3");
+            resp.sendRedirect("escenario4");
         }
     }
 
@@ -264,12 +291,12 @@ public class EscenarioUnoControlador extends HttpServlet {
     private void accionFinalizar(Escenario escenario, HttpSession sesion,
                                   HttpServletRequest req) {
         escenario.setModoEvaluacion(false);
-        sesion.removeAttribute("retoActual");
-        sesion.removeAttribute("retoObjetivo");
+        sesion.removeAttribute("retoActual3");
+        sesion.removeAttribute("retoObjetivo3");
         float pct = escenario.getProgreso().getPorcentajeAprendizaje();
         req.setAttribute("mensajeMascota",
             "Evaluación finalizada. Tu porcentaje de aprendizaje actual es "
-            + Math.round(pct) + "%. " 
+            + Math.round(pct) + "%. "
             + (pct >= 80 ? "¡Has superado el escenario!" : "Sigue practicando para alcanzar el 80%."));
     }
 
@@ -277,47 +304,65 @@ public class EscenarioUnoControlador extends HttpServlet {
     private void accionVolver(Escenario escenario, HttpSession sesion,
                                HttpServletResponse resp) throws IOException {
         escenario.salirEscenario();
-        sesion.removeAttribute("escenario1");
+        sesion.removeAttribute("escenario3");
         resp.sendRedirect("login.jsp");
     }
 
     // ── HELPERS ──────────────────────────────────────────────────────────────
 
     /**
-     * Genera un nuevo reto y publica "descripcionReto" y "nuevoReto" en request.
-     * NO pone mensajeMascota (eso lo hace el caller según contexto).
+     * Genera un nuevo reto para el Escenario 3.
+     * El átomo objetivo tiene: protones = Z, neutrones = A - Z (masa estándar), electrones = 0 (no se evalúan).
      */
     private void generarNuevoReto(Escenario escenario, Usuario usuario,
                                    HttpServletRequest req, HttpSession sesion) {
         ElementoBase ebObjetivo = elementoDAO.obtenerAleatorio();
         if (ebObjetivo == null) return;
 
-        Elemento atomoObjetivo = new Elemento(
-            ebObjetivo.getNumeroAtomico(),
-            ebObjetivo.getNumeroAtomico(),
-            ebObjetivo.getNumeroAtomico()
-        );
+        int z = ebObjetivo.getNumeroAtomico();
+        // Número másico estándar: redondeamos la masa atómica
+        int a = (int) Math.round(ebObjetivo.getMasaAtomica());
+        int n = a - z;
+        if (n < 0) n = z; // Fallback: si la masa no está bien cargada
+
+        // Para el Escenario 3 el elemento objetivo representa Z y A; electrones no se evalúan
+        Elemento atomoObjetivo = new Elemento(z, n, z); // electrones = z por convención (neutro)
 
         Reto reto = new Reto();
         reto.setIdUsuario(usuario.getIdUsuario());
         reto.setIdEscenario(ID_ESCENARIO);
-        reto.generarReto(ebObjetivo,
-            atomoObjetivo.getProtones(),
-            atomoObjetivo.getNeutrones(),
-            atomoObjetivo.getElectrones());
+        reto.generarReto(ebObjetivo, z, n, z);
 
         int idReto = retoDAO.insertar(reto);
         reto.setIdReto(idReto);
 
         escenario.setRetoActual(reto);
-        sesion.setAttribute("retoActual",   reto);
-        sesion.setAttribute("retoObjetivo", atomoObjetivo);
+        sesion.setAttribute("retoActual3",   reto);
+        sesion.setAttribute("retoObjetivo3", atomoObjetivo);
 
         req.setAttribute("nuevoReto",       true);
         req.setAttribute("retoActual",      reto);
         req.setAttribute("descripcionReto", reto.getDescripcion());
         req.setAttribute("temporizador",    reto.getTemporizador());
         req.setAttribute("intentosUsados",  0);
+
+        // Publicar datos del elemento objetivo para mostrarlo en pantalla
+        publicarElementoObjetivo(atomoObjetivo, reto, req);
+    }
+
+    /**
+     * Publica en request los datos del elemento objetivo
+     * para que el JSP pueda mostrar la "carta objetivo".
+     */
+    private void publicarElementoObjetivo(Elemento objetivo, Reto reto,
+                                           HttpServletRequest req) {
+        if (objetivo == null || reto == null) return;
+        ElementoBase eb = reto.getElementoObjetivo();
+        req.setAttribute("objProtones",  objetivo.getProtones());
+        req.setAttribute("objNeutrones", objetivo.getNeutrones());
+        req.setAttribute("objMasico",    objetivo.getNumeroMasico());
+        req.setAttribute("objSimbolo",   eb != null ? eb.getSimbolo() : "?");
+        req.setAttribute("objNombre",    eb != null ? eb.getNombre()  : "Desconocido");
     }
 
     private void actualizarElementoPorProtones(Escenario escenario,
@@ -349,10 +394,9 @@ public class EscenarioUnoControlador extends HttpServlet {
         int pct = Math.round(escenario.getProgreso().getPorcentajeAprendizaje());
         req.setAttribute("porcentaje", pct);
 
-        // Si hay reto activo en sesión, publicar sus datos
         HttpSession sesion = req.getSession(false);
         if (sesion != null) {
-            Reto ra = (Reto) sesion.getAttribute("retoActual");
+            Reto ra = (Reto) sesion.getAttribute("retoActual3");
             if (ra != null && req.getAttribute("retoActual") == null) {
                 req.setAttribute("retoActual",    ra);
                 req.setAttribute("temporizador",  ra.getTemporizador());
@@ -361,13 +405,19 @@ public class EscenarioUnoControlador extends HttpServlet {
                     req.setAttribute("descripcionReto", ra.getDescripcion());
                 }
             }
+
+            // Mantener datos del objetivo si ya hay reto activo
+            Elemento obj = (Elemento) sesion.getAttribute("retoObjetivo3");
+            if (obj != null && req.getAttribute("objProtones") == null) {
+                publicarElementoObjetivo(obj, ra, req);
+            }
         }
     }
 
     private Escenario obtenerOCrearEscenario(HttpSession sesion) {
-        Escenario escenario = (Escenario) sesion.getAttribute("escenario1");
+        Escenario escenario = (Escenario) sesion.getAttribute("escenario3");
         if (escenario == null) {
-            escenario = new Escenario(ID_ESCENARIO, "Arma tu átomo", 3);
+            escenario = new Escenario(ID_ESCENARIO, "Configura tu Átomo Objetivo", 3);
         }
         return escenario;
     }
