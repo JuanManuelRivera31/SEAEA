@@ -62,6 +62,15 @@
         <servlet-name>EscenarioTresControlador</servlet-name>
         <url-pattern>/escenario3</url-pattern>
     </servlet-mapping>
+    
+    <servlet>
+        <servlet-name>EscenarioCuatroControlador</servlet-name>
+        <servlet-class>controlador.EscenarioCuatroControlador</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>EscenarioCuatroControlador</servlet-name>
+        <url-pattern>/escenario4</url-pattern>
+    </servlet-mapping>
  
     <!-- ══════════════════════════════════════════════════════
     SERVLET: Test de conexión

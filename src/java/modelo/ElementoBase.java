@@ -23,6 +23,8 @@ public class ElementoBase {
     }
 
     // ─── Getters y Setters ─────────────────────────────────────────
+//    public int getIdElemento() { return idElemento; }
+//    public void setIdElemento(int idElemento) { this.idElemento = idElemento; }
     public String getNombre()       { return nombre;        }
     public String getSimbolo()      { return simbolo;       }
     public int    getNumeroAtomico(){ return numeroAtomico;  }
