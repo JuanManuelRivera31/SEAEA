@@ -46,7 +46,7 @@ public class EscenarioDosControlador extends HttpServlet {
 
         HttpSession sesion = req.getSession(false);
         if (sesion == null || sesion.getAttribute("usuario") == null) {
-            resp.sendRedirect(req.getContextPath() + "/login.jsp");
+            resp.sendRedirect(req.getContextPath() + "escenario3");
             return;
         }
 

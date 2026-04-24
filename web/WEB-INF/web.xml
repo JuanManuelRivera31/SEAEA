@@ -71,6 +71,24 @@
         <servlet-name>EscenarioCuatroControlador</servlet-name>
         <url-pattern>/escenario4</url-pattern>
     </servlet-mapping>
+    
+    <servlet>
+        <servlet-name>EscenarioCincoControlador</servlet-name>
+        <servlet-class>controlador.EscenarioCincoControlador</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>EscenarioCincoControlador</servlet-name>
+        <url-pattern>/escenario5</url-pattern>
+    </servlet-mapping>
+ 
+    <servlet>
+        <servlet-name>EscenarioSeisControlador</servlet-name>
+        <servlet-class>controlador.EscenarioSeisControlador</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>EscenarioSeisControlador</servlet-name>
+        <url-pattern>/escenario6</url-pattern>
+    </servlet-mapping>
  
     <!-- ══════════════════════════════════════════════════════
     SERVLET: Test de conexión

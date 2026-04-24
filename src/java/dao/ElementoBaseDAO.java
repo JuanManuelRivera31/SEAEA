@@ -22,7 +22,7 @@ public class ElementoBaseDAO {
      * Busca un elemento por su número atómico (Z = # protones). (RF-105)
      */
     public ElementoBase obtenerPorNumeroAtomico(int numeroAtomico) {
-        String sql = "SELECT nombre, simbolo, numero_atomico, masa_atomica "
+        String sql = "SELECT nombre, simbolo, numero_atomico, masa_atomica, radio_atomico, energia_ionizacion, electronegatividad, periodo, grupo, bloque "
                 + "FROM elemento_base WHERE numero_atomico = ?";
         try {
             PreparedStatement ps = getCon().prepareStatement(sql);
@@ -42,7 +42,7 @@ public class ElementoBaseDAO {
      * Devuelve todos los elementos ordenados por número atómico.
      */
     public List<ElementoBase> obtenerTodos() {
-        String sql = "SELECT nombre, simbolo, numero_atomico, masa_atomica "
+        String sql = "SELECT nombre, simbolo, numero_atomico, masa_atomica, radio_atomico, energia_ionizacion, electronegatividad, periodo, grupo, bloque "
                 + "FROM elemento_base ORDER BY numero_atomico";
         List<ElementoBase> lista = new ArrayList<>();
         try {
@@ -62,7 +62,7 @@ public class ElementoBaseDAO {
      * Devuelve un elemento aleatorio para generar el reto. (RF-111)
      */
     public ElementoBase obtenerAleatorio() {
-        String sql = "SELECT nombre, simbolo, numero_atomico, masa_atomica "
+        String sql = "SELECT nombre, simbolo, numero_atomico, masa_atomica, radio_atomico, energia_ionizacion, electronegatividad, periodo, grupo, bloque "
                 + "FROM elemento_base ORDER BY RAND() LIMIT 1";
         try {
             PreparedStatement ps = getCon().prepareStatement(sql);
@@ -83,6 +83,12 @@ public class ElementoBaseDAO {
         eb.setSimbolo(rs.getString("simbolo"));
         eb.setNumeroAtomico(rs.getInt("numero_atomico"));
         eb.setMasaAtomica(rs.getFloat("masa_atomica"));
+        eb.setRadioAtomico(rs.getFloat("radio_atomico"));
+        eb.setEnergiaIonizacion(rs.getFloat("energia_ionizacion"));
+        eb.setElectronegatividad(rs.getFloat("electronegatividad"));
+        eb.setPeriodo(rs.getInt("periodo"));
+        eb.setGrupo(rs.getInt("grupo"));
+        eb.setBloque(rs.getString("bloque"));
         return eb;
     }
 }

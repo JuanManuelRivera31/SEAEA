@@ -11,15 +11,27 @@ public class ElementoBase {
     private String simbolo;
     private int    numeroAtomico;   // Z = # protones
     private float  masaAtomica;
+    private float  radioAtomico;
+    private float  energiaIonizacion;
+    private float  electronegatividad;
+    private int    periodo;
+    private int    grupo;
+    private String bloque;      // "s", "p", "d", "f"
 
     // ─── Constructores ────────────────────────────────────────────
     public ElementoBase() { }
 
-    public ElementoBase(String nombre, String simbolo, int numeroAtomico, float masaAtomica) {
+    public ElementoBase(String nombre, String simbolo, int numeroAtomico, float masaAtomica, float radioAtomico, float energiaIonizacion, float electronegatividad, int periodo, int grupo, String bloque) {
         this.nombre        = nombre;
         this.simbolo       = simbolo;
         this.numeroAtomico = numeroAtomico;
         this.masaAtomica   = masaAtomica;
+        this.radioAtomico = radioAtomico;
+        this.energiaIonizacion = energiaIonizacion;
+        this.electronegatividad = electronegatividad;
+        this.periodo = periodo;
+        this.grupo = grupo;
+        this.bloque = bloque;
     }
 
     // ─── Getters y Setters ─────────────────────────────────────────
@@ -34,6 +46,25 @@ public class ElementoBase {
     public void setSimbolo(String simbolo)            { this.simbolo       = simbolo;       }
     public void setNumeroAtomico(int numeroAtomico)   { this.numeroAtomico = numeroAtomico;  }
     public void setMasaAtomica(float masaAtomica)     { this.masaAtomica   = masaAtomica;   }
+    
+    
+    public float  getRadioAtomico()            { return radioAtomico; }
+    public void   setRadioAtomico(float v)     { this.radioAtomico = v; }
+ 
+    public float  getEnergiaIonizacion()       { return energiaIonizacion; }
+    public void   setEnergiaIonizacion(float v){ this.energiaIonizacion = v; }
+ 
+    public float  getElectronegatividad()      { return electronegatividad; }
+    public void   setElectronegatividad(float v){ this.electronegatividad = v; }
+ 
+    public int    getPeriodo()                 { return periodo; }
+    public void   setPeriodo(int v)            { this.periodo = v; }
+ 
+    public int    getGrupo()                   { return grupo; }
+    public void   setGrupo(int v)              { this.grupo = v; }
+ 
+    public String getBloque()                  { return bloque; }
+    public void   setBloque(String v)          { this.bloque = v; }
 
     @Override
     public String toString() {
