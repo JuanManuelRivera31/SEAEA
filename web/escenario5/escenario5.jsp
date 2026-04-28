@@ -650,17 +650,24 @@ function confirmarVolver()   { if(confirm('¿Volver al menú? Se perderá el pro
 
 /* ── TIMER ── */
 let timerSeg=null,timerInvl=null;
+
+function actualizarHUD(segs){
+    const txt=segs>0?segs+'s':'¡Tiempo!';
+    const h=document.getElementById('hudTimer');
+    const m=document.getElementById('modTimer');
+    if(h){h.textContent=txt;h.className='hud-t'+(segs>20?' ok':'')}
+    if(m) m.textContent=txt;
+}
+
 function iniciarTimer(segs){
     if(timerInvl) clearInterval(timerInvl);
     timerSeg=segs;
+    // Actualizar HUD de inmediato: evita el parpadeo visible en 90s al recargar
+    actualizarHUD(timerSeg);
     timerInvl=setInterval(()=>{
         timerSeg--;
         sessionStorage.setItem('seaea5_timer',timerSeg);
-        const txt=timerSeg>0?timerSeg+'s':'¡Tiempo!';
-        const h=document.getElementById('hudTimer');
-        const m=document.getElementById('modTimer');
-        if(h){h.textContent=txt;h.className='hud-t'+(timerSeg>20?' ok':'')}
-        if(m) m.textContent=txt;
+        actualizarHUD(timerSeg);
         if(timerSeg<=0){
             clearInterval(timerInvl);timerInvl=null;
             sessionStorage.removeItem('seaea5_timer');
