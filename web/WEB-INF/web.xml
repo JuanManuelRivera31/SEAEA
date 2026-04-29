@@ -17,7 +17,6 @@
     ══════════════════════════════════════════════════════ -->
     <welcome-file-list>
         <welcome-file>index.html</welcome-file>
-        <welcome-file>login.jsp</welcome-file>
     </welcome-file-list>
  
     <!-- ══════════════════════════════════════════════════════
@@ -33,6 +32,18 @@
     </servlet-mapping>
  
     <!-- ══════════════════════════════════════════════════════
+    SERVLET: Menu
+    ══════════════════════════════════════════════════════ -->
+    <servlet>
+        <servlet-name>MenuControlador</servlet-name>
+        <servlet-class>controlador.MenuControlador</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>MenuControlador</servlet-name>
+        <url-pattern>/menu</url-pattern>
+    </servlet-mapping>
+ 
+    <!-- ══════════════════════════════════════════════════════
     SERVLETS: Escenarios
     ══════════════════════════════════════════════════════ -->
     <servlet>
@@ -43,8 +54,7 @@
         <servlet-name>EscenarioUnoControlador</servlet-name>
         <url-pattern>/escenario1</url-pattern>
     </servlet-mapping>
-    
-    
+ 
     <servlet>
         <servlet-name>EscenarioDosControlador</servlet-name>
         <servlet-class>controlador.EscenarioDosControlador</servlet-class>
@@ -53,7 +63,7 @@
         <servlet-name>EscenarioDosControlador</servlet-name>
         <url-pattern>/escenario2</url-pattern>
     </servlet-mapping>
-    
+ 
     <servlet>
         <servlet-name>EscenarioTresControlador</servlet-name>
         <servlet-class>controlador.EscenarioTresControlador</servlet-class>
@@ -62,7 +72,7 @@
         <servlet-name>EscenarioTresControlador</servlet-name>
         <url-pattern>/escenario3</url-pattern>
     </servlet-mapping>
-    
+ 
     <servlet>
         <servlet-name>EscenarioCuatroControlador</servlet-name>
         <servlet-class>controlador.EscenarioCuatroControlador</servlet-class>
@@ -71,7 +81,7 @@
         <servlet-name>EscenarioCuatroControlador</servlet-name>
         <url-pattern>/escenario4</url-pattern>
     </servlet-mapping>
-    
+ 
     <servlet>
         <servlet-name>EscenarioCincoControlador</servlet-name>
         <servlet-class>controlador.EscenarioCincoControlador</servlet-class>
@@ -114,11 +124,12 @@
     ══════════════════════════════════════════════════════ -->
     <error-page>
         <error-code>404</error-code>
-        <location>/login.jsp</location>
+        <location>/login</location>
     </error-page>
     <error-page>
         <error-code>500</error-code>
-        <location>/login.jsp</location>
+        <location>/login</location>
     </error-page>
  
 </web-app>
+ 

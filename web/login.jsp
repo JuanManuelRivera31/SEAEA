@@ -4,7 +4,7 @@
     // Si ya hay sesión activa, redirigir directamente al escenario 1
     Object usuarioSesion = session.getAttribute("usuario");
     if (usuarioSesion != null) {
-        response.sendRedirect("escenario1?accion=cargar");
+        response.sendRedirect(request.getContextPath() + "/menu");
         return;
     }
     // Obtener mensaje de error si viene del controlador

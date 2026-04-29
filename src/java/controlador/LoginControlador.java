@@ -27,7 +27,7 @@ public class LoginControlador extends HttpServlet {
         // Si ya tiene sesión, ir directo al escenario 1
         HttpSession sesion = req.getSession(false);
         if (sesion != null && sesion.getAttribute("usuario") != null) {
-            resp.sendRedirect(req.getContextPath() + "/escenario1?accion=cargar");
+            resp.sendRedirect(req.getContextPath() + "/menu");
             return;
         }
         req.getRequestDispatcher("/login.jsp").forward(req, resp);
@@ -61,7 +61,7 @@ public class LoginControlador extends HttpServlet {
                 sesion.setAttribute("usuario", usuario);
                 sesion.setMaxInactiveInterval(60 * 60); // 1 hora
                 // Redirigir al Escenario 1
-                resp.sendRedirect(req.getContextPath() + "/escenario1?accion=cargar");
+                resp.sendRedirect(req.getContextPath() + "/menu");
             } else {
                 // ❌ Credenciales incorrectas
                 req.setAttribute("errorLogin", "Correo o contraseña incorrectos.");
