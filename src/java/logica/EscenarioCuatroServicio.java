@@ -124,7 +124,7 @@ public class EscenarioCuatroServicio {
         reto.setDescripcion(
             "Configura el isótopo " + isoObj.getNombreDisplay()
             + ". Selecciona " + eb.getNombre()
-            + " (Z=" + z + ") y ajusta los neutrones a "
+            + " (Z=" + z + ") y ajusta neutrones a "
             + isoObj.getNumeroNeutrones() + ".");
 
         int idReto = retoDAO.insertar(reto);
