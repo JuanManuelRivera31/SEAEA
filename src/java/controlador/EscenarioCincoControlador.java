@@ -1,552 +1,363 @@
 package controlador;
- 
-import dao.*;
-import modelo.*;
- 
+
+import logica.EscenarioCincoServicio;
+import logica.EscenarioCincoServicio.*;
+import modelo.ElementoBase;
+import modelo.Escenario;
+import modelo.Reto;
+import modelo.Usuario;
+
 import jakarta.servlet.ServletException;
-import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.*;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
-import java.util.*;
- 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
  * EscenarioCincoControlador
- * Servlet del Escenario 5 "Configuración Electrónica".
+ * ─────────────────────────────────────────────────────────────────────────
+ * Controlador del Escenario 5 "Configuración Electrónica".
  *
- * Solo trabaja con elementos de bloque s y p (Z ≤ 36 aproximadamente,
- * pero filtrando solo bloque s y p de la BD).
+ * Responsabilidades ÚNICAS (MVC):
+ *  1. Verificar sesión activa.
+ *  2. Leer parámetros del request (acción, subnivel, celda, Z).
+ *  3. Recuperar/crear el Escenario desde sesión.
+ *  4. Delegar TODO el procesamiento a EscenarioCincoServicio.
+ *  5. Almacenar resultados en sesión/request (publicarDatos).
+ *  6. Forward al JSP o redirect según corresponda.
  *
- * Subniveles disponibles (bloque s y p, orden Aufbau):
- *   1s(2) → 2s(2) → 2p(6) → 3s(2) → 3p(6) →
- *   4s(2) → 3d(10) → 4p(6) → 5s(2) → 4d(10) → 5p(6) → ...
- * Para s y p solamente mostramos:
- *   1s, 2s, 2p, 3s, 3p, 4s, 4p, 5s, 5p, 6s, 6p, 7s, 7p
+ * El controlador NO contiene lógica de negocio.
+ * El controlador NO importa ni usa DAOs directamente.
  *
- * Interacción de celdas:
- *   1er clic → ↑   2do clic → ↓   3er clic → vacía
- *
- * Comprobación:
- *   Se verifica que el número de electrones colocados en CADA subnivel
- *   coincida con la configuración correcta calculada por Aufbau.
- *   En evaluación, debe coincidir completamente para aprobar el reto.
+ * NOTA: Sin @WebServlet porque web.xml tiene metadata-complete="true".
  */
-@WebServlet("/escenario5")
 public class EscenarioCincoControlador extends HttpServlet {
- 
-    private static final int ID_ESCENARIO = 5;
- 
-    // Orden Aufbau completo para s y p (máx capacidad por subnivel)
-    // formato: "nivel|tipo|capacidad"
-    private static final String[] SUBNIVELES_ORDEN = {
-        "1s", "2s", "2p", "3s", "3p", "4s", "4p",
-        "5s", "5p", "6s", "6p", "7s", "7p"
-    };
-    private static final Map<String, Integer> CAPACIDAD = new LinkedHashMap<>();
-    static {
-        CAPACIDAD.put("1s", 2); CAPACIDAD.put("2s", 2); CAPACIDAD.put("2p", 6);
-        CAPACIDAD.put("3s", 2); CAPACIDAD.put("3p", 6); CAPACIDAD.put("4s", 2);
-        CAPACIDAD.put("4p", 6); CAPACIDAD.put("5s", 2); CAPACIDAD.put("5p", 6);
-        CAPACIDAD.put("6s", 2); CAPACIDAD.put("6p", 6); CAPACIDAD.put("7s", 2);
-        CAPACIDAD.put("7p", 6);
-    }
- 
-    private final ElementoBaseDAO      elementoDAO = new ElementoBaseDAO();
-    private final RetoDAO              retoDAO     = new RetoDAO();
-    private final PuntajeRetoDAO       puntajeDAO  = new PuntajeRetoDAO();
-    private final ProgresoEscenarioDAO progresoDAO = new ProgresoEscenarioDAO();
- 
+
+    // ── Único acceso a la capa lógica ─────────────────────────────────────
+    private final EscenarioCincoServicio servicio = new EscenarioCincoServicio();
+
+    // ── Claves de sesión ─────────────────────────────────────────────────
+    private static final String SK_ESC        = "escenario5";
+    private static final String SK_ELEM_SELEC = "elemSelec5";
+    private static final String SK_ELEM_EVAL  = "elemEval5";
+    private static final String SK_CONFIG     = "configUsuario5";
+    private static final String SK_RESULTADO  = "resultadoConfig5";
+    private static final String SK_RETO       = "retoActual5";
+
+    // ── Vista ─────────────────────────────────────────────────────────────
+    private static final String JSP = "/escenario5/escenario5.jsp";
+
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
-            throws ServletException, IOException { procesarAccion(req, resp); }
- 
+            throws ServletException, IOException { procesar(req, resp); }
+
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
-            throws ServletException, IOException { procesarAccion(req, resp); }
- 
-    private void procesarAccion(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException { procesar(req, resp); }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // DISPATCHER CENTRAL
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void procesar(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
- 
+
+        // 1. Verificar sesión
         HttpSession sesion = req.getSession(false);
         if (sesion == null || sesion.getAttribute("usuario") == null) {
-            resp.sendRedirect(req.getContextPath() + "/login.jsp");
+            resp.sendRedirect(req.getContextPath() + "/login");
             return;
         }
- 
+
         Usuario   usuario   = (Usuario)   sesion.getAttribute("usuario");
         Escenario escenario = obtenerOCrearEscenario(sesion);
-        String    accion    = req.getParameter("accion");
+
+        String accion = req.getParameter("accion");
         if (accion == null) accion = "cargar";
- 
+
+        // 2. Delegar al servicio según acción
         switch (accion) {
-            case "cargar":
-                accionCargar(escenario, usuario, req, sesion);
-                break;
-            case "seleccionarElemento":
-                accionSeleccionarElemento(req, sesion);
-                break;
-            case "clickCelda":
-                accionClickCelda(req, sesion);
-                break;
-            case "reiniciar":
-                accionReiniciar(escenario, sesion);
-                break;
-            case "comprobar":
-                accionComprobar(escenario, usuario, req, sesion);
-                break;
-            case "iniciarEval":
-                accionIniciarEvaluacion(escenario, usuario, req, sesion);
-                break;
-            case "continuar":
-                accionContinuar(escenario, sesion, resp);
-                return;
-            case "finalizar":
-                accionFinalizar(escenario, sesion, req);
-                break;
-            case "volver":
-                accionVolver(escenario, sesion, resp);
-                return;
-            default:
-                accionCargar(escenario, usuario, req, sesion);
+            case "cargar":              accionCargar(escenario, usuario, req, sesion);       break;
+            case "seleccionarElemento": accionSeleccionarElemento(req, sesion);               break;
+            case "clickCelda":          accionClickCelda(req, sesion);                        break;
+            case "reiniciar":           accionReiniciar(escenario, sesion);                   break;
+            case "comprobar":           accionComprobar(escenario, usuario, req, sesion);     break;
+            case "iniciarEval":         accionIniciarEval(escenario, usuario, req, sesion);   break;
+            case "continuar":           accionContinuar(escenario, sesion, resp); return;
+            case "finalizar":           accionFinalizar(escenario, sesion, req);              break;
+            case "volver":              accionVolver(escenario, sesion, resp); return;
+            default:                    accionCargar(escenario, usuario, req, sesion);
         }
- 
-        sesion.setAttribute("escenario5", escenario);
+
+        // 3. Guardar escenario actualizado
+        sesion.setAttribute(SK_ESC, escenario);
+
+        // 4. Publicar atributos para el JSP
         publicarDatos(escenario, req, sesion);
-        req.getRequestDispatcher("/escenario5/escenario5.jsp").forward(req, resp);
+
+        // 5. Forward al JSP
+        req.getRequestDispatcher(JSP).forward(req, resp);
     }
- 
-    // ── CARGAR ───────────────────────────────────────────────────────────────
+
+    // ════════════════════════════════════════════════════════════════════════
+    // ACCIONES
+    // ════════════════════════════════════════════════════════════════════════
+
+    /** Carga inicial: progreso + mensaje de bienvenida de la mascota. */
     private void accionCargar(Escenario escenario, Usuario usuario,
                                HttpServletRequest req, HttpSession sesion) {
-        escenario.cargarEscenario();
-        float pct = progresoDAO.obtenerPorcentaje(usuario.getIdUsuario(), ID_ESCENARIO);
-        escenario.getProgreso().setPorcentajeAprendizaje(pct);
-        req.setAttribute("mensajeMascota", escenario.guiaMascota());
-        sesion.setAttribute("escenario5", escenario);
+        ResultadoCarga r = servicio.cargar(escenario, usuario);
+        req.setAttribute("mensajeMascota", r.mensajeMascota);
+        sesion.setAttribute(SK_ESC, escenario);
     }
- 
-    // ── SELECCIONAR ELEMENTO ─────────────────────────────────────────────────
-    private void accionSeleccionarElemento(HttpServletRequest req,
-                                            HttpSession sesion) {
+
+    /**
+     * Seleccionar elemento: valida bloque s/p y actualiza sesión.
+     * Si el elemento no es válido, pone mensaje de error.
+     */
+    private void accionSeleccionarElemento(HttpServletRequest req, HttpSession sesion) {
         String zStr = req.getParameter("numeroAtomico");
         if (zStr == null) return;
         int z;
         try { z = Integer.parseInt(zStr); } catch (NumberFormatException e) { return; }
- 
-        ElementoBase eb = elementoDAO.obtenerPorNumeroAtomico(z);
-        if (eb == null) return;
- 
-        // Solo permitir s y p
-        String bloque = eb.getBloque();
-        if (bloque == null || (!bloque.equalsIgnoreCase("s") && !bloque.equalsIgnoreCase("p"))) {
+
+        ElementoBase eb = servicio.seleccionarElemento(z);
+        if (eb == null) {
+            // Elemento de bloque d/f o no encontrado
+            String bloque = servicio.obtenerBloqueElemento(z);
             req.setAttribute("mensajeMascota",
-                "Este elemento es de bloque " + (bloque!=null?bloque:"desconocido") +
-                ". En este escenario solo se trabaja con elementos de bloque s y p.");
+                "Este elemento es de bloque " + bloque
+                + ". En este escenario solo se trabaja con elementos de bloque s y p.");
             return;
         }
- 
-        sesion.setAttribute("elemSelec5", eb);
-        // Limpiar configuración anterior
-        sesion.removeAttribute("configUsuario5");
-        sesion.removeAttribute("resultadoConfig5");
+
+        sesion.setAttribute(SK_ELEM_SELEC, eb);
+        // Limpiar configuración anterior al cambiar de elemento
+        sesion.removeAttribute(SK_CONFIG);
+        sesion.removeAttribute(SK_RESULTADO);
     }
- 
-    // ── CLICK EN CELDA ───────────────────────────────────────────────────────
+
     /**
-     * Parámetros: subnivel (ej "2p"), celda (0-5 índice de la celda)
-     * Estado de celda: 0=vacío, 1=↑, 2=↑↓
-     * Ciclo: 0→1→2→0
+     * Click en celda del diagrama: cicla el estado 0→1→2→0.
+     * Delega al servicio y persiste el mapa actualizado en sesión.
      */
     @SuppressWarnings("unchecked")
     private void accionClickCelda(HttpServletRequest req, HttpSession sesion) {
-        String subnivel = req.getParameter("subnivel");
-        String celdaStr = req.getParameter("celda");
+        String subnivel  = req.getParameter("subnivel");
+        String celdaStr  = req.getParameter("celda");
         if (subnivel == null || celdaStr == null) return;
- 
         int celda;
         try { celda = Integer.parseInt(celdaStr); } catch (NumberFormatException e) { return; }
- 
-        // Recuperar o crear mapa de configuración
-        Map<String, int[]> config = (Map<String,int[]>) sesion.getAttribute("configUsuario5");
+
+        Map<String, int[]> config = (Map<String, int[]>) sesion.getAttribute(SK_CONFIG);
         if (config == null) config = new LinkedHashMap<>();
- 
-        Integer cap = CAPACIDAD.get(subnivel);
-        if (cap == null) return;
-        int numCeldas = cap / 2; // cada celda = 2 electrones máximo
- 
-        int[] celdas = config.computeIfAbsent(subnivel, k -> new int[numCeldas]);
-        if (celda < 0 || celda >= celdas.length) return;
- 
-        // Ciclo: 0 → 1 → 2 → 0
-        celdas[celda] = (celdas[celda] + 1) % 3;
- 
-        // Validar: no se puede poner ↓ (estado 2) si la celda anterior está vacía
-        // y verificar Principio de Hund básico: no emparejarse antes de llenar
-        config.put(subnivel, celdas);
-        sesion.setAttribute("configUsuario5", config);
-        sesion.removeAttribute("resultadoConfig5");
+
+        // El servicio actualiza el mapa y lo retorna
+        config = servicio.ciclarCelda(config, subnivel, celda);
+
+        sesion.setAttribute(SK_CONFIG,    config);
+        sesion.removeAttribute(SK_RESULTADO); // limpiar resultado anterior al modificar
     }
- 
-    // ── REINICIAR ────────────────────────────────────────────────────────────
+
+    /** Reiniciar: limpia estado completo. */
     private void accionReiniciar(Escenario escenario, HttpSession sesion) {
-        escenario.reiniciarEscenario();
-        sesion.removeAttribute("elemSelec5");
-        sesion.removeAttribute("configUsuario5");
-        sesion.removeAttribute("resultadoConfig5");
-        sesion.removeAttribute("retoActual5");
-        sesion.removeAttribute("elemEval5");
+        servicio.reiniciar(escenario);
+        sesion.removeAttribute(SK_ELEM_SELEC);
+        sesion.removeAttribute(SK_CONFIG);
+        sesion.removeAttribute(SK_RESULTADO);
+        sesion.removeAttribute(SK_RETO);
+        sesion.removeAttribute(SK_ELEM_EVAL);
     }
- 
-    // ── COMPROBAR (simulación y evaluación) ──────────────────────────────────
+
+    /**
+     * Comprobar: delega al servicio según modo (simulación o evaluación).
+     * El servicio retorna el DTO con todo el resultado; el controlador
+     * lo publica como atributos de request/sesión.
+     */
     @SuppressWarnings("unchecked")
     private void accionComprobar(Escenario escenario, Usuario usuario,
                                   HttpServletRequest req, HttpSession sesion) {
         boolean modoEval = escenario.isModoEvaluacion();
-        ElementoBase eb  = modoEval
-            ? (ElementoBase) sesion.getAttribute("elemEval5")
-            : (ElementoBase) sesion.getAttribute("elemSelec5");
- 
-        if (eb == null) {
-            req.setAttribute("mensajeMascota",
-                modoEval ? "No hay reto activo. Presiona 'Iniciar Evaluación'."
-                         : "Selecciona un elemento de la tabla periódica primero.");
-            return;
-        }
- 
-        Map<String, int[]> config = (Map<String,int[]>) sesion.getAttribute("configUsuario5");
-        if (config == null) config = new LinkedHashMap<>();
- 
-        // Calcular configuración correcta
-        Map<String, Integer> correcta = calcularConfiguracion(eb.getNumeroAtomico());
- 
-        // Contar electrones del usuario
-        int electronesUsuario = contarElectrones(config);
-        int electronesCorrectos = eb.getNumeroAtomico(); // = nº electrones del átomo neutro
- 
-        // Comparar subnivel por subnivel
-        boolean configCorrecta = true;
-        StringBuilder detalle = new StringBuilder();
-        for (Map.Entry<String, Integer> entry : correcta.entrySet()) {
-            String sub = entry.getKey();
-            int   eCorr = entry.getValue();
-            int   eUser = contarElectronesSubnivel(config.get(sub));
-            if (eUser != eCorr) {
-                configCorrecta = false;
-                detalle.append("❌ ").append(sub).append(": tienes ").append(eUser)
-                       .append(", correcto es ").append(eCorr).append("\n");
-            } else {
-                detalle.append("✅ ").append(sub).append(": ").append(eCorr).append("\n");
-            }
-        }
-        // Verificar que no haya electrones en subniveles que no corresponden
-        for (Map.Entry<String, int[]> entry : config.entrySet()) {
-            String sub = entry.getKey();
-            if (!correcta.containsKey(sub)) {
-                int eUser = contarElectronesSubnivel(entry.getValue());
-                if (eUser > 0) {
-                    configCorrecta = false;
-                    detalle.append("❌ ").append(sub).append(": no debe tener electrones (").append(eUser).append(")\n");
-                }
-            }
-        }
- 
-        sesion.setAttribute("resultadoConfig5", configCorrecta ? "ok" : "err");
- 
+        Map<String, int[]> config = (Map<String, int[]>) sesion.getAttribute(SK_CONFIG);
+
         if (modoEval) {
-            Reto retoActual = (Reto) sesion.getAttribute("retoActual5");
-            if (retoActual == null) return;
- 
-            retoActual.registrarIntento();
-            int intento = retoActual.getIntentos();
-            req.setAttribute("resultadoCorrecto", configCorrecta);
-            req.setAttribute("intentosUsados",    intento);
- 
-            if (configCorrecta) {
-                retoActual.setCompletado(true);
-                PuntajeReto pr = new PuntajeReto(retoActual, intento, true);
-                escenario.getProgreso().agregarResultado(pr);
-                retoDAO.actualizar(retoActual);
-                puntajeDAO.insertar(retoActual.getIdReto(), intento, pr.getPuntaje(), true);
-                float nuevoPct = puntajeDAO.calcularPorcentajeAprendizaje(
-                        usuario.getIdUsuario(), ID_ESCENARIO);
-                progresoDAO.guardar(usuario.getIdUsuario(), ID_ESCENARIO, nuevoPct);
-                escenario.getProgreso().setPorcentajeAprendizaje(nuevoPct);
- 
-                req.setAttribute("mensajeMascota",
-                    "¡Excelente! La configuración de " + eb.getNombre()
-                    + " es correcta. Intento " + intento + ".\n"
-                    + "Configuración: " + construirNotacion(correcta));
- 
-                if (nuevoPct >= 80.0f) {
-                    req.setAttribute("habilitarContinuar", true);
-                } else {
-                    generarNuevoReto(escenario, usuario, req, sesion);
-                }
-            } else {
-                puntajeDAO.insertar(retoActual.getIdReto(), intento, 0.0f, false);
- 
-                if (retoActual.agotadoIntentos()) {
-                    PuntajeReto prF = new PuntajeReto(retoActual, 3, false);
-                    escenario.getProgreso().agregarResultado(prF);
-                    float nuevoPct = puntajeDAO.calcularPorcentajeAprendizaje(
-                            usuario.getIdUsuario(), ID_ESCENARIO);
-                    progresoDAO.guardar(usuario.getIdUsuario(), ID_ESCENARIO, nuevoPct);
-                    escenario.getProgreso().setPorcentajeAprendizaje(nuevoPct);
-                    retoDAO.actualizar(retoActual);
- 
-                    req.setAttribute("mensajeMascota",
-                        "Intentos agotados. La configuración correcta era:\n"
-                        + construirNotacion(correcta) + "\n\nDetalle:\n" + detalle
-                        + "\nHe generado un nuevo reto.");
-                    generarNuevoReto(escenario, usuario, req, sesion);
-                } else {
-                    int restantes = Reto.MAX_INTENTOS - intento;
-                    req.setAttribute("mensajeMascota",
-                        "Configuración incorrecta. Revisa:\n" + detalle
-                        + "Te quedan " + restantes + " intento(s).");
-                }
+            // ── Modo evaluación ───────────────────────────────────────────
+            Reto         retoActual = (Reto)         sesion.getAttribute(SK_RETO);
+            ElementoBase eb         = (ElementoBase) sesion.getAttribute(SK_ELEM_EVAL);
+
+            ResultadoComprobacion r = servicio.comprobar(
+                escenario, retoActual, eb, config, usuario);
+
+            // Publicar resultado
+            sesion.setAttribute(SK_RETO, retoActual);
+            sesion.setAttribute(SK_RESULTADO, r.correcto ? "ok" : "err");
+
+            req.setAttribute("resultadoCorrecto",  r.correcto);
+            req.setAttribute("intentosUsados",     r.intentoUsado);
+            req.setAttribute("mensajeMascota",     r.mensajeMascota);
+            req.setAttribute("habilitarContinuar", r.habilitarContinuar);
+
+            if (r.habilitarContinuar) {
+                // Porcentaje suficiente → no generar nuevo reto
+            } else if (r.generarNuevoReto) {
+                generarYPublicarReto(escenario, usuario, req, sesion);
             }
-            sesion.setAttribute("retoActual5", retoActual);
- 
-            Reto ra = (Reto) sesion.getAttribute("retoActual5");
-            if (ra != null && req.getAttribute("retoActual") == null) {
-                req.setAttribute("retoActual",    ra);
-                req.setAttribute("temporizador",  ra.getTemporizador());
-                req.setAttribute("intentosUsados", ra.getIntentos());
-            }
+
         } else {
-            // Modo simulación
-            if (configCorrecta) {
-                req.setAttribute("mensajeMascota",
-                    "¡Configuración CORRECTA! ✅\n"
-                    + eb.getNombre() + ": " + construirNotacion(correcta)
-                    + "\nElectrones totales: " + electronesCorrectos);
-            } else {
-                req.setAttribute("mensajeMascota",
-                    "Configuración INCORRECTA ❌\nDetalle:\n" + detalle.toString().trim()
-                    + "\n\nConfiguración correcta: " + construirNotacion(correcta));
-            }
+            // ── Modo simulación ───────────────────────────────────────────
+            ElementoBase eb = (ElementoBase) sesion.getAttribute(SK_ELEM_SELEC);
+
+            ResultadoSimulacion r = servicio.comprobarSimulacion(eb, config);
+
+            sesion.setAttribute(SK_RESULTADO, r.estadoConfig);
+            req.setAttribute("mensajeMascota", r.mensajeMascota);
         }
     }
- 
-    // ── INICIAR EVALUACIÓN ───────────────────────────────────────────────────
-    private void accionIniciarEvaluacion(Escenario escenario, Usuario usuario,
-                                          HttpServletRequest req, HttpSession sesion) {
-        escenario.iniciarEvaluacion();
-        generarNuevoReto(escenario, usuario, req, sesion);
+
+    /** Iniciar evaluación: activa modo y genera primer reto. */
+    private void accionIniciarEval(Escenario escenario, Usuario usuario,
+                                    HttpServletRequest req, HttpSession sesion) {
+        servicio.iniciarEvaluacion(escenario);
+        generarYPublicarReto(escenario, usuario, req, sesion);
     }
- 
-    // ── CONTINUAR ────────────────────────────────────────────────────────────
+
+    /** Continuar: si superó el umbral → marca superado → redirige al siguiente escenario. */
     private void accionContinuar(Escenario escenario, HttpSession sesion,
                                   HttpServletResponse resp) throws IOException {
-        if (escenario.getProgreso().getPorcentajeAprendizaje() >= 80.0f) {
-            escenario.superarEscenario();
-            sesion.removeAttribute("escenario5");
-            resp.sendRedirect("escenario6");
+        if (servicio.puedeSuperar(escenario)) {
+            servicio.superar(escenario);
+            sesion.removeAttribute(SK_ESC);
+            resp.sendRedirect("escenario6"); // progresión correcta
+        } else {
+            resp.sendRedirect("escenario5");
         }
     }
- 
-    // ── FINALIZAR ────────────────────────────────────────────────────────────
+
+    /** Finalizar evaluación: desactiva modo eval y limpia estado. */
     private void accionFinalizar(Escenario escenario, HttpSession sesion,
                                   HttpServletRequest req) {
-        escenario.setModoEvaluacion(false);
-        sesion.removeAttribute("retoActual5");
-        sesion.removeAttribute("elemEval5");
-        sesion.removeAttribute("configUsuario5");
-        sesion.removeAttribute("resultadoConfig5");
-        float pct = escenario.getProgreso().getPorcentajeAprendizaje();
-        req.setAttribute("mensajeMascota",
-            "Evaluación finalizada. Tu porcentaje: " + Math.round(pct) + "%. "
-            + (pct >= 80 ? "¡Superaste el escenario!" : "Sigue practicando para alcanzar el 80%."));
+        String mensaje = servicio.finalizar(escenario);
+        limpiarEvaluacion(sesion);
+        req.setAttribute("mensajeMascota", mensaje);
     }
- 
-    // ── VOLVER ───────────────────────────────────────────────────────────────
+
+    /** Volver: sale del escenario y redirige al menú. */
     private void accionVolver(Escenario escenario, HttpSession sesion,
                                HttpServletResponse resp) throws IOException {
-        escenario.salirEscenario();
-        sesion.removeAttribute("escenario5");
-        resp.sendRedirect("login.jsp");
+        servicio.salir(escenario);
+        sesion.removeAttribute(SK_ESC);
+        resp.sendRedirect("menu"); // corregido: era "login.jsp"
     }
- 
+
     // ════════════════════════════════════════════════════════════════════════
-    // HELPERS
+    // HELPERS DEL CONTROLADOR
     // ════════════════════════════════════════════════════════════════════════
- 
-    /** Genera reto con elemento aleatorio de bloque s o p */
-    private void generarNuevoReto(Escenario escenario, Usuario usuario,
-                                   HttpServletRequest req, HttpSession sesion) {
-        ElementoBase eb = null;
-        for (int i = 0; i < 30; i++) {
-            ElementoBase candidato = elementoDAO.obtenerAleatorio();
-            if (candidato != null) {
-                String blq = candidato.getBloque();
-                if (blq != null && (blq.equalsIgnoreCase("s") || blq.equalsIgnoreCase("p"))) {
-                    eb = candidato;
-                    break;
-                }
-            }
-        }
-        if (eb == null) return;
- 
-        Map<String, Integer> correcta = calcularConfiguracion(eb.getNumeroAtomico());
- 
-        Reto reto = new Reto();
-        reto.setIdUsuario(usuario.getIdUsuario());
-        reto.setIdEscenario(ID_ESCENARIO);
-        reto.generarReto(eb, eb.getNumeroAtomico(), 0, eb.getNumeroAtomico());
-        reto.setDescripcion(
-            "Realiza la configuración electrónica de: "
-            + eb.getNombre() + " (Z = " + eb.getNumeroAtomico() + ")\n"
-            + "Configuración esperada: " + construirNotacion(correcta));
- 
-        int idReto = retoDAO.insertar(reto);
-        reto.setIdReto(idReto);
- 
-        escenario.setRetoActual(reto);
-        sesion.setAttribute("retoActual5",    reto);
-        sesion.setAttribute("elemEval5",      eb);
-        sesion.removeAttribute("configUsuario5");
-        sesion.removeAttribute("resultadoConfig5");
- 
-        req.setAttribute("nuevoReto",       true);
-        req.setAttribute("retoActual",      reto);
-        req.setAttribute("descripcionReto", reto.getDescripcion());
-        req.setAttribute("temporizador",    reto.getTemporizador());
-        req.setAttribute("intentosUsados",  0);
-    }
- 
+
     /**
-     * Calcula la configuración electrónica por la regla de Aufbau
-     * SOLO para subniveles s y p.
-     * Retorna mapa subnivel → número de electrones (solo los que tienen electrones).
+     * Llama al servicio para generar un reto y publica los atributos
+     * en request/sesión para que el JSP los reciba.
      */
-    public static Map<String, Integer> calcularConfiguracion(int z) {
-        // Orden Aufbau completo (incluye d y f para contar bien)
-        String[] ordenCompleto = {
-            "1s","2s","2p","3s","3p","4s","3d","4p",
-            "5s","4d","5p","6s","4f","5d","6p",
-            "7s","5f","6d","7p"
-        };
-        Map<String, Integer> capCompleta = new LinkedHashMap<>();
-        capCompleta.put("1s",2); capCompleta.put("2s",2); capCompleta.put("2p",6);
-        capCompleta.put("3s",2); capCompleta.put("3p",6); capCompleta.put("4s",2);
-        capCompleta.put("3d",10);capCompleta.put("4p",6); capCompleta.put("5s",2);
-        capCompleta.put("4d",10);capCompleta.put("5p",6); capCompleta.put("6s",2);
-        capCompleta.put("4f",14);capCompleta.put("5d",10);capCompleta.put("6p",6);
-        capCompleta.put("7s",2); capCompleta.put("5f",14);capCompleta.put("6d",10);
-        capCompleta.put("7p",6);
- 
-        Map<String, Integer> resultado = new LinkedHashMap<>();
-        int restantes = z;
-        for (String sub : ordenCompleto) {
-            if (restantes <= 0) break;
-            int cap = capCompleta.get(sub);
-            int eEnSub = Math.min(restantes, cap);
-            // Solo guardar subniveles s y p
-            if (sub.endsWith("s") || sub.endsWith("p")) {
-                resultado.put(sub, eEnSub);
-            }
-            restantes -= eEnSub;
-        }
-        return resultado;
+    private void generarYPublicarReto(Escenario escenario, Usuario usuario,
+                                       HttpServletRequest req, HttpSession sesion) {
+        ResultadoReto r = servicio.generarReto(usuario);
+        if (r == null) return;
+
+        escenario.setRetoActual(r.reto);
+
+        sesion.setAttribute(SK_RETO,      r.reto);
+        sesion.setAttribute(SK_ELEM_EVAL, r.elementoBase);
+        sesion.removeAttribute(SK_CONFIG);
+        sesion.removeAttribute(SK_RESULTADO);
+
+        req.setAttribute("nuevoReto",       true);
+        req.setAttribute("retoActual",      r.reto);
+        req.setAttribute("descripcionReto", r.reto.getDescripcion());
+        req.setAttribute("temporizador",    r.reto.getTemporizador());
+        req.setAttribute("intentosUsados",  0);
+        req.setAttribute("retoId",          String.valueOf(r.reto.getIdReto()));
     }
- 
-    /** Construye la notación estándar ej. "1s² 2s² 2p⁶" */
-    private String construirNotacion(Map<String, Integer> config) {
-        String[] sup = {"⁰","¹","²","³","⁴","⁵","⁶","⁷","⁸","⁹",
-                        "¹⁰","¹¹","¹²","¹³","¹⁴"};
-        StringBuilder sb = new StringBuilder();
-        for (Map.Entry<String, Integer> e : config.entrySet()) {
-            if (e.getValue() > 0) {
-                int v = e.getValue();
-                String superIndex = (v < sup.length) ? sup[v] : String.valueOf(v);
-                sb.append(e.getKey()).append(superIndex).append(" ");
-            }
-        }
-        return sb.toString().trim();
-    }
- 
-    private int contarElectrones(Map<String, int[]> config) {
-        int total = 0;
-        for (int[] celdas : config.values()) total += contarElectronesSubnivel(celdas);
-        return total;
-    }
- 
-    private int contarElectronesSubnivel(int[] celdas) {
-        if (celdas == null) return 0;
-        int total = 0;
-        for (int c : celdas) {
-            if (c == 1) total += 1;
-            else if (c == 2) total += 2;
-        }
-        return total;
-    }
- 
+
+    /**
+     * Publica TODOS los datos que el JSP necesita como atributos de request.
+     * Único punto de comunicación controlador → JSP.
+     */
     @SuppressWarnings("unchecked")
     private void publicarDatos(Escenario escenario, HttpServletRequest req,
                                 HttpSession sesion) {
+        // Porcentaje y modo
         int pct = Math.round(escenario.getProgreso().getPorcentajeAprendizaje());
-        req.setAttribute("porcentaje",    pct);
-        req.setAttribute("modoEvaluacion", escenario.isModoEvaluacion());
+        req.setAttribute("porcentaje",        pct);
+        req.setAttribute("modoEvaluacion",    escenario.isModoEvaluacion());
         req.setAttribute("habilitarContinuar",
-            escenario.getProgreso().getPorcentajeAprendizaje() >= 80.0f
+            escenario.getProgreso().getPorcentajeAprendizaje() >= EscenarioCincoServicio.MINIMO_APROBATORIO
             && escenario.isModoEvaluacion());
- 
-        // Elementos de la tabla periódica (solo s y p)
-        List<ElementoBase> todos = elementoDAO.obtenerTodos();
-        List<ElementoBase> spList = new ArrayList<>();
-        for (ElementoBase e : todos) {
-            String b = e.getBloque();
-            if (b != null && (b.equalsIgnoreCase("s") || b.equalsIgnoreCase("p")))
-                spList.add(e);
-        }
-        req.setAttribute("elementosPeriodica", spList);
- 
-        // Elemento seleccionado
+
+        // Lista de elementos (solo s y p) para la tabla periódica
+        req.setAttribute("elementosPeriodica", servicio.obtenerElementosSP());
+
+        // Elemento activo según modo
         boolean modoEval = escenario.isModoEvaluacion();
         ElementoBase ebActual = modoEval
-            ? (ElementoBase) sesion.getAttribute("elemEval5")
-            : (ElementoBase) sesion.getAttribute("elemSelec5");
+            ? (ElementoBase) sesion.getAttribute(SK_ELEM_EVAL)
+            : (ElementoBase) sesion.getAttribute(SK_ELEM_SELEC);
         req.setAttribute("elemActual", ebActual);
- 
-        // Z seleccionado para marcar tabla
+
+        // Z seleccionado para marcar la celda en la tabla
         int zSelec = (ebActual != null) ? ebActual.getNumeroAtomico() : 0;
         req.setAttribute("zSeleccionado", zSelec);
- 
-        // Configuración del usuario
-        Map<String, int[]> config = (Map<String,int[]>) sesion.getAttribute("configUsuario5");
+
+        // Configuración actual del usuario
+        Map<String, int[]> config = (Map<String, int[]>) sesion.getAttribute(SK_CONFIG);
         if (config == null) config = new LinkedHashMap<>();
         req.setAttribute("configUsuario", config);
- 
-        // Electrones colocados
-        req.setAttribute("electronesColocados", contarElectrones(config));
- 
-        // Configuración correcta (si hay elemento)
+
+        // Total de electrones colocados (lo calcula el servicio)
+        req.setAttribute("electronesColocados", servicio.contarElectrones(config));
+
+        // Configuración correcta y notación (si hay elemento seleccionado)
         if (ebActual != null) {
-            Map<String, Integer> correcta = calcularConfiguracion(ebActual.getNumeroAtomico());
-            req.setAttribute("configCorrecta", correcta);
-            req.setAttribute("notacionCorrecta", construirNotacion(correcta));
+            Map<String, Integer> correcta =
+                EscenarioCincoServicio.calcularConfiguracion(ebActual.getNumeroAtomico());
+            req.setAttribute("configCorrecta",  correcta);
+            req.setAttribute("notacionCorrecta",
+                EscenarioCincoServicio.construirNotacion(correcta));
         }
- 
-        // Resultado
-        req.setAttribute("resultadoConfig", sesion.getAttribute("resultadoConfig5"));
- 
-        // HUD reto
-        Reto ra = (Reto) sesion.getAttribute("retoActual5");
+
+        // Resultado de la última comprobación ("ok" / "err" / null)
+        req.setAttribute("resultadoConfig", sesion.getAttribute(SK_RESULTADO));
+
+        // HUD del reto activo (si no fue ya publicado por la acción)
+        Reto ra = (Reto) sesion.getAttribute(SK_RETO);
         if (ra != null && req.getAttribute("retoActual") == null) {
-            req.setAttribute("retoActual",    ra);
-            req.setAttribute("temporizador",  ra.getTemporizador());
+            req.setAttribute("retoActual",     ra);
+            req.setAttribute("temporizador",   ra.getTemporizador());
             req.setAttribute("intentosUsados", ra.getIntentos());
             if (req.getAttribute("descripcionReto") == null)
                 req.setAttribute("descripcionReto", ra.getDescripcion());
+            req.setAttribute("retoId", String.valueOf(ra.getIdReto()));
         }
-        String retoId = (ra != null) ? String.valueOf(ra.getIdReto()) : "";
-        req.setAttribute("retoId", retoId);
+        if (req.getAttribute("retoId") == null)
+            req.setAttribute("retoId", "");
     }
- 
+
+    // ── Limpieza de sesión ────────────────────────────────────────────────
+
+    private void limpiarEvaluacion(HttpSession sesion) {
+        sesion.removeAttribute(SK_RETO);
+        sesion.removeAttribute(SK_ELEM_EVAL);
+        sesion.removeAttribute(SK_CONFIG);
+        sesion.removeAttribute(SK_RESULTADO);
+    }
+
+    // ── Obtener o crear el Escenario desde sesión ─────────────────────────
     private Escenario obtenerOCrearEscenario(HttpSession sesion) {
-        Escenario esc = (Escenario) sesion.getAttribute("escenario5");
+        Escenario esc = (Escenario) sesion.getAttribute(SK_ESC);
         if (esc == null)
-            esc = new Escenario(ID_ESCENARIO, "Configuración Electrónica", 3);
+            esc = new Escenario(EscenarioCincoServicio.ID_ESCENARIO,
+                                "Configuración Electrónica", 3);
         return esc;
     }
 }

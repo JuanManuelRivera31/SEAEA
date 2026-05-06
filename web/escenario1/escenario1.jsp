@@ -1,4 +1,4 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+E<%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ page import="modelo.ElementoBase, modelo.Reto" %>
 <%
     // ── Datos del átomo ──────────────────────────────────────────────────────

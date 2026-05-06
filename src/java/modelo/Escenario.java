@@ -7,7 +7,7 @@ import java.util.List;
  * Escenario
  * Orquesta el simulador del Escenario 1 "Arma tu átomo".
  * Corresponde a la clase Escenario del diagrama de clases.
- *
+ *  
  * Responsabilidades:
  *  - Gestionar el estado del simulador (exploración vs evaluación).
  *  - Coordinar el elemento activo, los retos y el progreso.
