@@ -21,21 +21,45 @@ public class ElementoBaseDAO {
     /**
      * Busca un elemento por su número atómico (Z = # protones). (RF-105)
      */
-    public ElementoBase obtenerPorNumeroAtomico(int numeroAtomico) {
-        String sql = "SELECT nombre, simbolo, numero_atomico, masa_atomica, radio_atomico, energia_ionizacion, electronegatividad, periodo, grupo, bloque "
-                + "FROM elemento_base WHERE numero_atomico = ?";
-        try {
-            PreparedStatement ps = getCon().prepareStatement(sql);
-            ps.setInt(1, numeroAtomico);
-            ResultSet rs = ps.executeQuery();
+    public ElementoBase obtenerPorNumeroAtomico(int z) {
+
+    // ── MEDICIÓN CAPA CONEXIÓN ─────────────────────────
+    long t0Conexion = System.currentTimeMillis();
+    Connection con = ConexionDB.getInstancia().getConexion();
+    long t1Conexion = System.currentTimeMillis();
+    System.out.println("[TIEMPO][CU1-seleccionarElemento] Conexión: "
+        + (t1Conexion - t0Conexion) + " ms");
+
+    // ── MEDICIÓN CAPA DAO (incluye query + mapeo) ──────
+    long t0DAO = System.currentTimeMillis();
+
+    String sql = "SELECT * FROM elemento_base WHERE numero_atomico = ?";
+    try (PreparedStatement ps = con.prepareStatement(sql)) {
+        ps.setInt(1, z);
+        try (ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
-                return mapear(rs);
+
+                // ── MEDICIÓN CAPA MODELO (mapeo) ───────
+                long t0Modelo = System.currentTimeMillis();
+                ElementoBase eb = mapear(rs);
+                long t1Modelo = System.currentTimeMillis();
+                System.out.println("[TIEMPO][CU1-seleccionarElemento] Modelo: "
+                    + (t1Modelo - t0Modelo) + " ms");
+
+                long t1DAO = System.currentTimeMillis();
+                System.out.println("[TIEMPO][CU1-seleccionarElemento] DAO: "
+                    + (t1DAO - t0DAO) + " ms");
+                return eb;
             }
-        } catch (SQLException e) {
-            System.err.println("ElementoBaseDAO.obtenerPorNumeroAtomico: " + e.getMessage());
         }
-        return null;
+    } catch (SQLException e) {
+        System.err.println("ElementoBaseDAO.obtenerPorNumeroAtomico: " + e.getMessage());
     }
+    long t1DAO = System.currentTimeMillis();
+    System.out.println("[TIEMPO][CU1-seleccionarElemento] DAO: "
+        + (t1DAO - t0DAO) + " ms");
+    return null;
+}
 
     // ─── Obtener todos los elementos ──────────────────────────────
     /**

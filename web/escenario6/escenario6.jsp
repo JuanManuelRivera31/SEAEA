@@ -1,6 +1,8 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ page import="modelo.ElementoBase, modelo.Reto, java.util.List" %>
 <%
+    
+    long t0Vista = System.currentTimeMillis();
     // ── Porcentaje y modo ────────────────────────────────────────────────────
     int     porcentaje = request.getAttribute("porcentaje")     != null ? (int)request.getAttribute("porcentaje")     : 0;
     boolean modoEval   = Boolean.TRUE.equals(request.getAttribute("modoEvaluacion"));
@@ -58,6 +60,9 @@
 
     int zA = hayA ? ebA.getNumeroAtomico() : 0;
     int zB = hayB ? ebB.getNumeroAtomico() : 0;
+    
+    long t1Vista = System.currentTimeMillis();
+    System.out.println("[TIEMPO][CU1] Vista: " + (t1Vista - t0Vista) + " ms");
 %>
 
 <%! 

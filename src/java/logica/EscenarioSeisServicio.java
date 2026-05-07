@@ -90,39 +90,46 @@ public class EscenarioSeisServicio {
      * @param ebB  elemento B actual (puede ser null)
      * @return ResultadoSeleccion con los nuevos A, B y si se deben limpiar respuestas
      */
+    
     public ResultadoSeleccion seleccionarElemento(int z,
-                                                   ElementoBase ebA,
-                                                   ElementoBase ebB) {
-        ElementoBase elem = elementoDAO.obtenerPorNumeroAtomico(z);
-        if (elem == null) {
-            // Z no encontrado en BD: no cambiar nada
-            return new ResultadoSeleccion(ebA, ebB, false);
-        }
- 
-        // Clic en A ya seleccionado
-        if (ebA != null && ebA.getNumeroAtomico() == z) {
-            ElementoBase nuevoA = ebB; // promover B a A si existe
-            return new ResultadoSeleccion(nuevoA, null, true);
-        }
- 
-        // Clic en B ya seleccionado
-        if (ebB != null && ebB.getNumeroAtomico() == z) {
-            return new ResultadoSeleccion(ebA, null, true);
-        }
- 
-        // Sin A → asignar A
-        if (ebA == null) {
-            return new ResultadoSeleccion(elem, ebB, false);
-        }
- 
-        // Hay A, sin B → asignar B
-        if (ebB == null) {
-            return new ResultadoSeleccion(ebA, elem, false);
-        }
- 
-        // Hay A y B → reset: nuevo A, sin B
-        return new ResultadoSeleccion(elem, null, true);
+                                               ElementoBase ebA,
+                                               ElementoBase ebB) {
+    // ── MEDICIÓN CAPA LÓGICA (inicio) ──────────────────
+    long t0Logica = System.currentTimeMillis();
+
+    ElementoBase elem = elementoDAO.obtenerPorNumeroAtomico(z); // ← el DAO registra su tiempo internamente
+
+    // Lógica de toggle
+    if (ebA != null && ebA.getNumeroAtomico() == z) {
+        ElementoBase nuevoA = ebB;
+        long t1Logica = System.currentTimeMillis();
+        System.out.println("[TIEMPO][CU1-seleccionarElemento] Lógica: "
+            + (t1Logica - t0Logica) + " ms");
+        return new ResultadoSeleccion(nuevoA, null, true);
     }
+    if (ebB != null && ebB.getNumeroAtomico() == z) {
+        long t1Logica = System.currentTimeMillis();
+        System.out.println("[TIEMPO][CU1-seleccionarElemento] Lógica: "
+            + (t1Logica - t0Logica) + " ms");
+        return new ResultadoSeleccion(ebA, null, true);
+    }
+    if (ebA == null) {
+        long t1Logica = System.currentTimeMillis();
+        System.out.println("[TIEMPO][CU1-seleccionarElemento] Lógica: "
+            + (t1Logica - t0Logica) + " ms");
+        return new ResultadoSeleccion(elem, ebB, false);
+    }
+    if (ebB == null) {
+        long t1Logica = System.currentTimeMillis();
+        System.out.println("[TIEMPO][CU1-seleccionarElemento] Lógica: "
+            + (t1Logica - t0Logica) + " ms");
+        return new ResultadoSeleccion(ebA, elem, false);
+    }
+    long t1Logica = System.currentTimeMillis();
+    System.out.println("[TIEMPO][CU1-seleccionarElemento] Lógica: "
+        + (t1Logica - t0Logica) + " ms");
+    return new ResultadoSeleccion(elem, null, true);
+}
  
     // ══════════════════════════════════════════════════════════════════════
     // REINICIO

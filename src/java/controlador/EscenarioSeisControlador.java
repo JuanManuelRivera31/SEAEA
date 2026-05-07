@@ -118,26 +118,32 @@ public class EscenarioSeisControlador extends HttpServlet {
     }
  
     /** Toggle A/B: delega al servicio y actualiza sesión con los nuevos elementos. */
-    private void accionSeleccionarElemento(HttpServletRequest req, HttpSession sesion) {
-        String zStr = req.getParameter("numeroAtomico");
-        if (zStr == null) return;
-        int z;
-        try { z = Integer.parseInt(zStr); } catch (NumberFormatException e) { return; }
- 
-        ElementoBase ebA = (ElementoBase) sesion.getAttribute(SK_ELEM_A);
-        ElementoBase ebB = (ElementoBase) sesion.getAttribute(SK_ELEM_B);
- 
-        ResultadoSeleccion r = servicio.seleccionarElemento(z, ebA, ebB);
- 
-        // Actualizar sesión con el resultado del servicio
-        if (r.nuevoA != null) sesion.setAttribute(SK_ELEM_A, r.nuevoA);
-        else                   sesion.removeAttribute(SK_ELEM_A);
- 
-        if (r.nuevoB != null) sesion.setAttribute(SK_ELEM_B, r.nuevoB);
-        else                   sesion.removeAttribute(SK_ELEM_B);
- 
-        if (r.limpiarRespuestas) limpiarRespuestas(sesion);
-    }
+    // ── CASO DE USO 1: seleccionarElemento ──────────────────────────────
+private void accionSeleccionarElemento(HttpServletRequest req, HttpSession sesion) {
+    String zStr = req.getParameter("numeroAtomico");
+    if (zStr == null) return;
+    int z;
+    try { z = Integer.parseInt(zStr); } catch (NumberFormatException e) { return; }
+
+    // ── MEDICIÓN CAPA CONTROLADOR ─────────────────────
+    long t0Controlador = System.currentTimeMillis();
+
+    ElementoBase ebA = (ElementoBase) sesion.getAttribute(SK_ELEM_A);
+    ElementoBase ebB = (ElementoBase) sesion.getAttribute(SK_ELEM_B);
+
+    ResultadoSeleccion r = servicio.seleccionarElemento(z, ebA, ebB);
+
+    long t1Controlador = System.currentTimeMillis();
+    System.out.println("[TIEMPO][CU1-seleccionarElemento] Controlador: "
+        + (t1Controlador - t0Controlador) + " ms");
+    // ─────────────────────────────────────────────────
+
+    if (r.nuevoA != null) sesion.setAttribute(SK_ELEM_A, r.nuevoA);
+    else                   sesion.removeAttribute(SK_ELEM_A);
+    if (r.nuevoB != null) sesion.setAttribute(SK_ELEM_B, r.nuevoB);
+    else                   sesion.removeAttribute(SK_ELEM_B);
+    if (r.limpiarRespuestas) limpiarRespuestas(sesion);
+}
  
     /** Reinicio completo: limpia sesión y delega al servicio. */
     private void accionReiniciar(Escenario escenario, HttpSession sesion) {
